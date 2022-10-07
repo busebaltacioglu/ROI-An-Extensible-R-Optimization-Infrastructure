@@ -1,0 +1,873 @@
+---
+title: "ROI:An Extensible R Optimization Infrastructure"
+author: "Buse BALTACIOĞLU ~ 2019900540"
+date: "25 01 2021"
+output:
+  tufte::tufte_handout:
+    latex_engine: xelatex
+  colortheme: seahorse
+  bookdown::pdf_document2:
+    latex_engine: lualatex
+  fonttheme: structurebold
+  beamer_presentation: null
+  theme: Ilmenau
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+---
+
+# ROI Nedir?
+
+ R optimizasyon altyapısı paketi, doğrusal, ikinci dereceden, konik ve genel doğrusal olmayan optimizasyon problemlerini tutarlı bir şekilde modellemek için genişletilebilir bir altyapı sağlar.
+ 
+ Ayrıca altyapı, optimizasyon problemlerini çeşitli formatlarda okumak ve yazmak için birçok farklı çözücüyü, reformülasyonu, problem koleksiyonunu ve işlevi yönetir.
+
+ Optimizasyon; istatistik, makine öğrenimmi ve veri biliminde rutin olarak kullanılan birçok yöntemde önemli bir rol oynar.
+ 
+ Genellikle, bu yöntemlerin uygulamaları, yalnızca belirli bir uygulamada uygulanabilecek şekilde tasarlanmıştır, oldukça özelleştirilmiş optimizasyon algoritmalarına dayanır.
+
+# R optimizasyon altyapısının avantajları
+
+* Optimizasyon problemi tek bir nesnede saklanır.
+
+* Sorunun çözümü sırasında tutarlılık açısından kontrol edilebilir.
+
+* Optimizasyon probleminin farklı elementlerine, problem oluşturulduktan sonra kolayca erişilebilir.
+
+* Tüm optimizasyon problemini yeniden tanımlamaya gerek kalmadan kolayca düzenlenebilir.
+
+* Son gelişmeleri R çözücü ortamına eklemek kolaydır.
+
+* ROI ve 23 tanımlayıcı paketi ile genişletilebilir olarak tasarlanmıştır.
+
+# ROI'de kullanılan optimizasyon modeli sınıfları
+
+ Abbreviation | Full name
+------------- | -------------
+     **BLP**  | Binary Linear Programming
+      **CP**  | Conic Programming
+      **IP**  | Integer Programming
+      **LP**  | Linear Programming
+    **MILP**  | Mixed Integer Linear Programming
+     **MIP**  | Mixed Integer Programming
+     **NLP**  | Nonlinear Programming
+    **QCQP**  | Quadratically Constraint Quadratic Programming
+      **QP**  | Quadratic Programming
+     **SDP**  | Semidefinite Programming
+    **SOCP**  | Second Order Cone Programming
+
+
+# ROI'nin Kullanım Alanları
+
+Kullanım Alanları                      | Konular
+---------------------------------------|---------
+**Kombinatoryal Problemler**           | Sudoku
+**Doğrusal Regresyon **                | En küçük kareler 
+**Doğrusal Regresyon  **               | En az mutlak sapma problemi
+**Genelleştirilmiş Doğrusal Modeller** | Lojistik regresyon
+**Genelleştirilmiş Doğrusal Modeller** | Poisson regresyon
+**Model Seçimi        **               | Ridge regresyonu
+**Model Seçimi         **              | Kement
+**Portföy Optimizasyonu**              | Portföy optimizasyonu
+**Ağ Modelleri          **             | MILP ile finansal risk ağı optimizasyonu
+
+
+# ROI'ye Giriş
+
+ İlgili bir optimizasyon problemini tanımlayan bir model kurduktan sonra problemi bir algoritmanın anlayabileceği şekilde kodlamaktır. En temel biçim bir vektörler kümesi ve bir kısıtlama matrisidir.
+
+
+## Amaç Fonksiyonu
+
+* Ulaşılmak istenen amacın matematiksel ifadesidir.
+
+* Karar değişkenlerinin bir fonksiyonudur.
+
+* Optimizasyon kriterini verir.
+
+OP(**objective**, constraints, types, bounds, maximum = FALSE)
+
+- *Genel doğrusal olmayan amaç fonksiyonu*
+
+F_objective(F, n, G = NULL, H = NULL, names = NULL)
+
+- *Doğrusal amaç fonksiyonu*
+
+L_objective(L, names = NULL)
+
+- *İkinci dereceden amaç fonksiyonu*
+
+Q_objective(Q, L = NULL, names = NULL)
+
+
+## Kısıtlar
+
+* İşletme kısıtlarını ifade eden matematiksel fonksiyonlardır.
+
+* Eşitlik veya eşitsizlik biçiminde ifade edilir.
+
+OP(objective, **constraints**, types, bounds, maximum = FALSE)
+
+- *Genel doğrusal olmayan kısıtlar*
+
+F_constraint(F, dir, rhs, J = NULL, names = NULL)
+
+- *Konik kısıtlar*
+
+C_constraint(L, cones, rhs, names = NULL)
+
+- *İkinci dereceden kısıtlar*
+
+Q_constraint(Q, L, dir, rhs, names = NULL)
+
+- *Doğrusal kısıtlar*
+
+L_constraint(L, dir, rhs, names = NULL)
+
+
+## Karar Değişkenleri
+
+* Değerini bizim belirlemek istediğimiz değişkenlerdir.
+
+* Verilecek kararı ifade eder. 
+
+OP(objective, constraints, **types**, bounds, maximum = FALSE)
+
+Karar değişken tipleri;
+
++ C : Sürekli 
++ I : Tamsayılı
++ B : İkili 
+
+## Hedef Değişken Sınırları
+
+OP(objective, constraints, types, **bounds**, maximum = FALSE)
+
+V_bound(li, ui, lb, ub, nobj, ld = 0, ud = Inf, names = NULL)
+
+
+**Doğrusal programlama ile ilgili örnek**
+
+```{r echo=FALSE, out.width="200px"}
+library(png)
+library(grid)
+img <- readPNG("C:/Users/Casper/Desktop/soru_1.png")
+ grid.raster(img)
+ 
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(ROI)
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+
+con<-rbind(c(5,7,2),
+           c(3,2,-9),
+           c(1,3,1))
+
+con_dir<-c("<=","<=","<=")
+
+rhs<-c(61,35,31)
+
+lp<-OP(objective = L_objective(c(3,7,-12)),
+       constraints = L_constraint(con,
+                                  dir = con_dir,
+                                  rhs = rhs),
+       bounds = V_bound(li = 3,
+                        ui = 3,
+                        lb = -10,
+                        ub = 10,
+                        nobj = 3),
+       maximum = TRUE)
+lp
+```
+
+**Alternatif kodlama** 
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+
+lp<-OP()
+
+objective(lp)<-L_objective(c(3,7,-12))
+
+constraints(lp)<-L_constraint(con,
+                              dir = con_dir,
+                              rhs = rhs)
+
+bounds(lp)<-V_bound(li = 3,
+                    ui = 3,
+                    lb = -10,
+                    ub = 10,
+                    nobj = 3)
+
+maximum(lp)<-TRUE
+
+lp
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+param<-rep.int(1, length(objective(lp)))
+
+objective(lp)(param)
+```
+Ayarlayıcı işlevleri, önceden oluşturulmuş OP'leri değiştirmeyi kolaylaştırır. 
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+terms(objective(lp))
+```
+Amaç fonksiyonunun verilerine erişmek için genel işlev terms() kullanılmalıdır.
+
+OP() işlevi her zaman tüm OP'yi depolayan 'OP' sınıfına ait bir S3 nesnesi döndürür. Saklama tek bir R nesnesindeki OP, diğerleri arasında birçok avantaja sahiptir:
+
+- Sorunun çözümü sırasında tutarlılık açısından kontrol edilebilir.
+
+- OP'nin farklı elementlerine, problem oluşturulduktan sonra kolayca erişilebilir.
+
+- Tüm OP'yi yeniden tanımlamaya gerek kalmadan kolayca düzenlenebilir, örneğin bir kısıt eklenebilir, sınırlar değiştirilebilir.
+
+- Tutarlılık kontrolleri, karar değişkenlerin boyutlarının birbirine uyduğunu doğrular.
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+(ROI_solve(lp))
+```
+
+# ROI Çözücüleri
+
+ROI_solve(x, solver, control = list(), ...)
+
+ROI, birden çok optimizasyon çözücüsü için tek bir arayüz oluşturan bir R paketidir. Optimizasyon problemleri için farklı çözücüleri kolayca değiştirmek isteyen R kullanıcılarına büyük kolaylık sağlar. 
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+ROI_installed_solvers()
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+ROI_applicable_solvers(lp)
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+(lp_sol<-ROI_solve(lp, solver = "alabama", start=double(3)))
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+(lp_sol<-ROI_solve(lp, solver = "glpk"))
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+solution(lp_sol, type = "aux")
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+solution(lp_sol, type = "msg")
+```
+
+# Amaç Fonksiyonu ve Kısıtların Durumuna Göre Çözücüler
+
+```{r echo=FALSE, out.width="700px"}
+img_2<- readPNG("C:/Users/Casper/Desktop/co.png")
+ grid.raster(img_2)
+ 
+```
+
+**İkili programlama ile ilgili örnek**
+
+```{r echo=FALSE, out.width="200px"}
+img_3 <- readPNG("C:/Users/Casper/Desktop/soru_2.png")
+ grid.raster(img_3)
+ 
+```
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+blp<-OP(objective = L_objective(c(-1,-1,-1,-1,-99)),
+        constraints = L_constraint(rbind(c(1,1,0,0,0), c(0,0,1,1,0), c(0,0,0,1,1)),
+                                   dir = c("<=","<=","<="),
+                                   rhs = rep.int(1,3)),
+        types = rep("B",5L))
+```
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+blp_sol<-ROI_solve(blp,
+                   solver = "glpk",
+                   method = "msbinlp",
+                   nsol_max = 32)
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+blp_sol
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+solution(blp_sol)
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+lp_inaccurate_sol<-ROI_solve(lp,
+                             solver = "glpk",
+                             tol = 1e-32)
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+solution(lp_inaccurate_sol, force = TRUE)
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+solution(lp_sol, type = "dual")
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+solution(lp_sol, type = "aux")
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+solution(lp_sol, type = "msg")
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+solution(lp_sol, type = "objval")
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+solution(lp_sol, type = "status")
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+solution(lp_sol, type = "status_code")
+```
+
+# Optimizasyon Problemlerini Okuma ve Yazma
+
+Optimizasyon sorunları genellikle özel düz metin dosyalarında depolanır ve paylaşılır. LP ve MIP dosya formatları için "mps","lp","sif" ve "freemps" yaygın olarak kullanılmaktadır.
+
++ Örnek 1
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+lp_file<-tempfile()
+
+ROI_write(lp, lp_file, "lp_lpsolve")
+
+writeLines(readLines(lp_file))
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+ROI_read(lp_file, "lp_lpsolve")
+```
+
++ Örnek 2
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+tmpfile <- tempfile()
+con <- gzcon(url("http://www.zib.de/koch/perplex/data/netlib/mps/capri.mps.gz"))
+writeLines(readLines(con), tmpfile)
+close(con)
+(capri <- ROI_read(tmpfile, type="mps_fixed", "lpsolve"))
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+(sol <- ROI_solve(capri))
+```
+
+# Test Koleksiyonları
+
+Yazılım deposu NETLIB, diğer birçok yazılımın yanı sıra bir doğrusal programlama test koleksiyonunu da içerir.
+
+```{r echo=TRUE, message=TRUE, warning=FALSE }
+library(ROI.models.netlib)
+netlib()
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+netlib("boeing1")
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+problem_name<-"boeing1"
+
+model<-netlib(problem_name)
+
+ROI_solve(model)
+```
+
+**İkinci dereceden programlama ile ilgili örnek**
+
+```{r echo=FALSE, out.width="200px"}
+img_4 <- readPNG("C:/Users/Casper/Desktop/soru_3.png")
+ grid.raster(img_4)
+ 
+```
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+qp<-OP(Q_objective(Q = diag(2), L = c(-1,0)),
+       L_constraint(c(4,6), ">=", 10))
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+qp_sol<-ROI_solve(qp, "qpoases")
+
+qp_sol
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+solution(qp_sol)
+```
+
+Ek kısıt eklememiz gerekirse
+
+$7x_1 + 11x_2 − x_1^2 − x_2^2 ≥ 40$
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+qcqp<-qp
+
+constraints(qcqp)<-rbind(constraints(qp),
+                         Q_constraint(-diag(c(2,2)),
+                                      L = c(7,11),
+                                      ">=", 40))
+
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+ROI_applicable_solvers(qcqp)
+```
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+qcqp_sol<-ROI_solve(qcqp, "alabama", start = c(5,5))
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+solution(qcqp_sol, type = "msg")
+```
+
+**Doğrusal olmayan programlama ile ilgili örnek**
+
+```{r echo=FALSE, out.width="200px"}
+img_5 <- readPNG("C:/Users/Casper/Desktop/soru_4.png")
+ grid.raster(img_5)
+ 
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+nlp1<-OP(maximum = TRUE, 
+         bounds = V_bound(ud = 42, nobj = 3L))
+
+objective(nlp1)<-F_objective(F = function(x) prod(x),
+                             n =3,
+                             G = function(x) c(prod(x[-1]),
+                                               prod(x[-2]),
+                                               prod(x[-3])))
+
+constraints(nlp1)<-F_constraint(F = function(x) x[1]+2*x[2]+2*x[3], 
+                                dir = "<=", 
+                                rhs = 72,
+                                J= function(x)c(1,2,2))
+
+nlp1
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+nlp1_sol1<-ROI_solve(nlp1, "alabama", 
+                     start = c(10,10,10))
+
+nlp1_sol1
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+solution(nlp1_sol1)
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+nlp1_sol2<-ROI_solve(nlp1, "alabama",
+                     start = double(3))
+nlp1_sol2
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+solution(nlp1_sol2, type = "msg")
+```
+
+**Karışık tamsayılı programlama ile ilgili örnek**
+
+```{r echo=FALSE, out.width="200px"}
+img_6 <- readPNG("C:/Users/Casper/Desktop/soru_5.png")
+ grid.raster(img_6)
+ 
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+A<-rbind(c(5,3),c(7,1))
+
+milp<-OP(c(5,7),
+         constraints = L_constraint(A, c(">=",">="),
+                                    c(7,9)),
+         types = c("B", "I"))
+
+milp_sol<-ROI_solve(milp, solver = "glpk")
+
+milp_sol
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+solution(milp_sol)
+```
+
+# Uygulamalar
+
+## Doğrusal Regresyon Problemi
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+create_L1_problem <- function(x, y) {
+ p <- ncol(x) + 1L
+ m <- 2 * nrow(x)
+ L <- cbind(1, x, diag(nrow(x)), -diag(nrow(x)))
+ bnds <- V_bound(li = seq_len(p), lb = rep(-Inf, p), nobj = p+m)
+ OP(objective = L_objective(c(rep(0, p), rep(1, m))),
+    constraints = L_constraint(L, dir = eq(nrow(x)), rhs = y),
+    bounds = bnds)
+ }
+```
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+data("stackloss", package = "datasets")
+
+l1p<-create_L1_problem(x = as.matrix(stackloss)[,-4],
+                       y = stackloss[,4])
+
+
+L1_res<-ROI_solve(l1p, solver = "glpk")
+
+roi_sol<-solution(L1_res)[1:ncol(stackloss)]
+```
+Bu değerler model katsayılarına karşılık gelir.
+
+- lmtest paketiyle regresyonu çözüp model katsayılarını karşılaştıralım
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+attach(stackloss)
+lmodel<-lm(stack.loss~Air.Flow+Water.Temp+Acid.Conc., data = stackloss)
+lm_sol<-lmodel$coefficients
+```
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+difference<-(roi_sol-lm_sol)
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+cbind(roi_sol,lm_sol, difference)
+```
+
+## Gezgin Satıcı Problemi
+
+Bir şehir listesi ve her bir şehir çifti arasındaki mesafeler göz önüne alındığında, her şehri tam olarak bir kez ziyaret edip başlangıç şehrine geri dönen mümkün olan en kısa rota nedir?
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+library(knitr)
+library(dplyr)
+library(ggplot2)
+```
+
+Şehir sayısı:
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+n<-10
+```
+
+Öklid uzayının sınırı: 
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+max_x<-500
+max_y<-500
+```
+
+Bazı rastgele şehirler:
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+set.seed(123456)
+cities <- data.frame(id = 1:n, x = runif(n, max = max_x), y = runif(n, max = max_y))
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+ggplot(cities, aes(x,y)) + geom_point()
+```
+
+Mesafe matrisi
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+distance <- as.matrix(stats::dist(select(cities, x, y), diag = TRUE, upper = TRUE))
+dist_fun <- function(i, j) {
+  vapply(seq_along(i), function(k) distance[i[k], j[k]], numeric(1L))
+}
+```
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+library(ompr)
+```
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+model <- MIPModel() %>%
+  # we create a variable that is 1 iff we travel from city i to j
+  add_variable(x[i, j], i = 1:n, j = 1:n, 
+               type = "integer", lb = 0, ub = 1) %>%
+  
+  # a helper variable for the MTZ formulation of the tsp
+  add_variable(u[i], i = 1:n, lb = 1, ub = n) %>% 
+  
+  # minimize travel distance
+  set_objective(sum_expr(dist_fun(i, j) * x[i, j], i = 1:n, j = 1:n), "min") %>%
+  
+  # you cannot go to the same city
+  set_bounds(x[i, i], ub = 0, i = 1:n) %>%
+  
+  # leave each city
+  add_constraint(sum_expr(x[i, j], j = 1:n) == 1, i = 1:n) %>%
+  #
+  # visit each city
+  add_constraint(sum_expr(x[i, j], i = 1:n) == 1, j = 1:n) %>%
+  
+  # ensure no subtours (arc constraints)
+  add_constraint(u[i] >= 2, i = 2:n) %>% 
+  add_constraint(u[i] - u[j] + 1 <= (n - 1) * (1 - x[i, j]), i = 2:n, j = 2:n)
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+model
+```
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+library(ompr.roi)
+library(ROI.plugin.glpk)
+```
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+result <- solve_model(model, with_ROI(solver = "glpk", verbose = TRUE))
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+result
+head(result$solution)
+```
+
+Çözümü çıkarmak için get_solution, tidyverse paketlerle daha fazla kullanabileceğimiz bir data.frame döndüren yöntemi kullanabiliriz.
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+solution <- get_solution(result, x[i, j]) %>% 
+  filter(value > 0) 
+kable(head(solution, 3))
+```
+
+Şimdi modelimizdeki indeksleri gerçek şehirlerle tekrar ilişkilendirmemiz gerekiyor.
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+paths <- select(solution, i, j) %>% 
+  rename(from = i, to = j) %>% 
+  mutate(trip_id = row_number()) %>% 
+  tidyr::gather(property, idx_val, from:to) %>% 
+  mutate(idx_val = as.integer(idx_val)) %>% 
+  inner_join(cities, by = c("idx_val" = "id"))
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+kable(head(arrange(paths, trip_id), 4))
+```
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+ggplot(cities, aes(x, y)) + 
+  geom_point() + 
+  geom_line(data = paths, aes(group = trip_id)) + 
+  ggtitle(paste0("Optimal route with cost: ", round(objective_value(result), 2)))
+```
+
+Gezgin satıcı problemimiz için ürettiğimiz şehirler arasında minimum yolu bulmayı hedeflemiştik ve optimal değerimizi 1469.86 bulmuş olduk.
+
+## Sudoku yaratma ve çözme
+
+ Sudoku'nun bir ikili optimizasyon problemi olarak formüle edilebileceği iyi bilinmektedir.
+ 
+ R paketleri sudoku ve sudokuAlt üretmek ve Sudoku bulmacaları çözmek için kullanılabilir.
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+library(sudokuAlt)
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+sudoku_puzzle <- makeGame()
+plot(sudoku_puzzle)
+```
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+library(slam)
+library(ROI)
+library(ROI.plugin.msbinlp)
+library(ROI.plugin.glpk)
+```
+
+Yardımcı fonksiyonlar
+```{r}
+as.matrix.sudoku <- function(x) matrix(as.numeric(x), 9, 9)
+
+to_col_index <- function(i, j, v) {
+    (v - 1) * 81 + (i - 1) * 9 + j
+}
+
+index_to_triplet <- function(idx) {
+    .index_to_triplet <- function(idx) {
+        v <- (idx - 1) %/% 81 + 1
+        idx <- idx - (v - 1) * 81
+        i <- (idx - 1)%/% 9 + 1
+        idx <- idx - (i - 1) * 9
+        c(i = i, j = idx, v = v)
+    }
+    t(sapply(idx, .index_to_triplet))
+}
+
+solve_sudoku <- function(M, solver, solve = TRUE, ...) {
+    stm <- simple_triplet_matrix
+    seq9_9 <- rep(1:9, 9)
+    seq9_9e <- rep(1:9, each = 9)
+    seq81_9e <- rep(seq_len(81), each = 9)
+    ones729 <- rep.int(1, 9^3)
+    M <- as.matrix(M)
+    M[is.na(M)] <- 0
+    M <- as.simple_triplet_matrix(M)
+    ## setup OP
+    op <- OP(double(9^3))
+    ## basic setting (fixed coefficients)
+    j <- mapply(to_col_index, M$i, M$j, M$v)
+    nfv <- length(M$i) ## number of fixed variables
+    A0 <- stm(i = seq_len(nfv), j = j, v = rep.int(1, nfv), ncol = 9^3)
+    LC0 <- L_constraint(A0, eq(nfv), rep.int(1, nfv))
+    ## sum_{i=1:n} x_ijk = 1,  j = 1:n, k = 1:n
+    only_one_k_in_each_column <- function(j, k) {
+        sapply(1:9, function(i) to_col_index(i, j, k))
+    }
+    j <- unlist(mapply(only_one_k_in_each_column, seq9_9e, seq9_9, SIMPLIFY = FALSE))
+    A1 <- stm(i = seq81_9e, j = j, v = ones729, nrow = 81, ncol = 9^3)
+    ## sum_{j=1:n} x_ijk = 1
+    only_one_k_in_each_row <- function(i, k) {
+        sapply(1:9, function(j) to_col_index(i, j, k))
+    }
+    j <- unlist(mapply(only_one_k_in_each_row, seq9_9e, seq9_9, SIMPLIFY = FALSE))
+    A2 <- stm(i = seq81_9e, j = j, v = ones729, nrow = 81, ncol = 9^3)
+    only_one_k_in_each_submatrix <- function(blocki, blockj, k) { 
+        i <- (blocki - 1) * 3 + 1:3
+        j <- (blockj - 1) * 3 + 1:3
+        coo <- expand.grid(i = i, j = j, v = k)
+        mapply(to_col_index, i = coo$i, j = coo$j, v = coo$v)
+    }
+    coo <- expand.grid(i = 1:3, j = 1:3, k = 1:9)
+    j <- unlist(mapply(only_one_k_in_each_submatrix, 
+                       blocki = coo$i, blockj = coo$j, k  = coo$k, SIMPLIFY = FALSE))
+    A3 <- stm(i = seq81_9e, j = j, v = ones729, ncol = 9^3)
+    ## at every position in the matrix must be one value
+    fill_matrix <- function(i, j) {
+        sapply(1:9, function(k) to_col_index(i, j, k))
+    }
+    j <- unlist(mapply(fill_matrix, i = seq9_9e, j = seq9_9, SIMPLIFY = FALSE))
+    A4 <- stm(i = seq81_9e, j = j, v = ones729, ncol = 9^3)
+    A <- rbind(A1, A2, A3, A4)
+    LC1 <- L_constraint(A, eq(nrow(A)), rep.int(1, nrow(A)))
+    constraints(op) <- rbind(LC0, LC1)
+    types(op) <- rep.int("B", 9^3)
+    if (!solve) return(op)
+    s <- ROI_solve(op, solver = solver, ...)
+    sol <- solution(s)
+    to_sudoku_solution <- function(sol) {
+        coo <- index_to_triplet(which(as.logical(sol)))
+        sudoku_solution <- as.matrix(stm(coo[,1], coo[,2], coo[,3]), nrow = 9, ncol = 9)
+        structure(sudoku_solution, class = c("sudoku", "matrix"))
+    }
+    
+    if ( any(lengths(sol) > 1L) & length(sol) > 1L ) {
+        lapply(solution(s), to_sudoku_solution)
+    } else {
+        if ( length(sol) == 1L ) {
+            to_sudoku_solution(sol[[1L]])
+        } else {
+            to_sudoku_solution(sol)
+        }
+    }
+}
+
+sudoku_is_valid_solution <- function(x) {
+    .sudoku_is_valid_solution <- function(x) {
+        stopifnot(inherits(x, "sudoku"))
+        seq19 <- seq_len(9)
+        for (i in seq19) {
+            if ( any(sort(as.vector(x[i, ])) != seq19) ) return(FALSE)
+            if ( any(sort(as.vector(x[, i])) != seq19) ) return(FALSE)
+        }
+        for (i in 1:3) {
+            for (j in 1:3) {
+                block <- x[(i-1) * 3 + 1:3, (j-1) * 3 + 1:3]
+                if ( any(sort(as.vector(block)) != seq19) ) return(FALSE)
+            }
+        }
+        return(TRUE)
+    }
+    if ( is.list(x) ) {
+        sapply(x, .sudoku_is_valid_solution)
+    } else {
+        .sudoku_is_valid_solution(x)
+    }
+}
+```
+
+Yukarıda tanımladığımız sudokuyu çözelim.
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+sudoku_solution <- solve_sudoku(sudoku_puzzle, solver = "glpk")
+sudoku_is_valid_solution(sudoku_solution)
+```
+
+```{r echo=TRUE, message=TRUE, warning=FALSE}
+sudoku_solution
+```
+
+Ayrıca Sudoku için birden fazla çözüm olup olmadığını kontrol etmek kolaydır. Burada, tüm çözümleri elde ediyoruz.
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+has_unique_solution <- inherits(sudoku_solution, "sudoku")
+```
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+sudoku_solution <- solve_sudoku(sudoku_puzzle, solver = "msbinlp", nsol_max = 10L)
+```
+
+# Kaynaklar
+
+- https://www.jstatsoft.org/article/view/v094i15
+
+- https://rdrr.io/cran/ROI/man/ROI_write.html
+
+- http://roi.r-forge.r-project.org/index.html
+
+- https://www.r-orms.org/mixed-integer-linear-programming/practicals/problem-course-assignment/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

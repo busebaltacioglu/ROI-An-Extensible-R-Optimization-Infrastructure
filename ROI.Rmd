@@ -1,0 +1,900 @@
+---
+title: "ROI"
+author: "Buse Baltacıoğlu"
+date: "04 01 2021"
+output: pdf_document
+---
+#Özet
+#1. Giriş
+#2. Problem Sınıfları
+#3. Yazılım
+#4. Veri Yapıları
+#4.1 Amaç fonksiyonu
+#4.2 Kısıtlar
+#4.3 Karar değişkenleri
+#4.4 Sınırlar
+#4.5 Optimizasyon problemi
+
+
+maximize(z) = 3x1 + 7x2 − 12x3
+subject to    5x1 + 7x2 + 2x3 <= 61
+              3x1 + 2x2 − 9x3 <= 35
+               x1 + 3x2 +  x3 <= 31
+                       x1, x2 >= 0, x3€[−10, 10].
+
+
+```{r}
+con<-rbind(c(5,7,2),
+           c(3,2,-9),
+           c(1,3,1))
+
+con_dir<-c("<=","<=","<=")
+
+rhs<-c(61,35,31)
+
+lp<-OP(objective = L_objective(c(3,7,-12)),
+       constraints = L_constraint(con,
+                                  dir = con_dir,
+                                  rhs = rhs),
+       bounds = V_bound(li = 3,
+                        ui = 3,
+                        lb = -10,
+                        ub = 10,
+                        nobj = 3),
+       maximum = TRUE)
+lp
+```
+
+Alternatif
+
+```{r}
+lp<-OP()
+
+objective(lp)<-L_objective(c(3,7,-12))
+
+constraints(lp)<-L_constraint(con,
+                              dir = con_dir,
+                              rhs = rhs)
+
+bounds(lp)<-V_bound(li = 3,
+                    ui = 3,
+                    lb = -10,
+                    ub = 10,
+                    nobj = 3)
+
+maximum(lp)<-TRUE
+
+lp
+```
+
+```{r}
+param<-rep.int(1, length(objective(lp)))
+
+objective(lp)(param)
+```
+Ayarlayıcı işlevleri, önceden oluşturulmuş OP'leri değiştirmeyi kolaylaştırır. 
+
+```{r}
+terms(objective(lp))
+```
+Amaç fonksiyonunun verilerine erişmek için genel işlev terms() kullanılmalıdır.
+
+OP() işlevi her zaman tüm OP'yi depolayan 'OP' sınıfına ait bir S3 nesnesi döndürür. Saklama tek bir R nesnesindeki OP, diğerleri arasında birçok avantaja sahiptir:
+
+Sorunun çözümü sırasında tutarlılık açısından kontrol edilebilir.
+
+OP'nin farklı elementlerine, problem oluşturulduktan sonra kolayca erişilebilir.
+
+Tüm OP'yi yeniden tanımlamaya gerek kalmadan kolayca düzenlenebilir, örneğin bir kısıt eklenebilir, sınırlar değiştirilebilir.
+
+Tutarlılık kontrolleri, karar değişkenlerin boyutlarının birbirine uyduğunu doğrular.
+
+
+#5. İşlevsellik
+
+#5.1 Optimizasyon problemi çözümleri
+```{r}
+lp_sol<-ROI_solve(lp, solver = "glpk")
+lp_sol
+```
+#5.2 Çözüm ve durum kodu
+```{r}
+solution(lp_sol)
+```
+
+
+minimize(z) = −x1 − x2 − x3 − x4 − 99x5
+subject to    x1 + x2 <= 1
+              x3 + x4 <= 1
+              x4 + x5 <= 1
+              xi€{0, 1}
+
+#Binary Linear Programming
+
+```{r}
+blp<-OP(objective = L_objective(c(-1,-1,-1,-1,-99)),
+        constraints = L_constraint(rbind(c(1,1,0,0,0), c(0,0,1,1,0), c(0,0,0,1,1)),
+                                   dir = c("<=","<=","<="),
+                                   rhs = rep.int(1,3)),
+        types = rep("B",5L))
+```
+
+```{r}
+blp_sol<-ROI_solve(blp,
+                   solver = "glpk",
+                   method = "msbinlp",
+                   nsol_max = 32)
+```
+
+```{r}
+blp_sol
+```
+
+```{r}
+solution(blp_sol)
+```
+
+```{r}
+lp_inaccurate_sol<-ROI_solve(lp,
+                             solver = "glpk",
+                             tol = 1e-32)
+```
+
+```{r}
+solution(lp_inaccurate_sol, force = TRUE)
+```
+
+```{r}
+solution(lp_sol, type = "dual")
+```
+
+```{r}
+solution(lp_sol, type = "aux")
+```
+
+```{r}
+solution(lp_sol, type = "msg")
+```
+
+```{r}
+solution(lp_sol, type = "objval")
+```
+
+```{r}
+solution(lp_sol, type = "status")
+```
+
+```{r}
+solution(lp_sol, type = "status_code")
+```
+
+#5.3 Reformulations
+#Quadratic Programming
+
+minimize() = −x − 4y − z + 3xy + yz
+             x, y, z € {0, 1}
+
+```{r}
+Q<-rbind(c(0,3,0), c(0,0,1), c(0,0,0))
+
+bqp<-OP(Q_objective(Q=Q+t(Q),
+                    L=c(-1,-4,-1)),
+        types = rep("B", 3))
+
+glpk_signature<-ROI_solver_signature("glpk")
+
+head(glpk_signature, 3)
+```
+
+```{r}
+milp<-ROI_reformulate(x = bqp, to = glpk_signature)
+
+ROI_solve(milp, solver = "glpk")
+```
+
+#5.4 ROI çözücüleri
+
+```{r}
+ROI_available_solvers(bqp)[, c("Package", "Repository")]
+```
+
+```{r}
+head(ROI_registered_solvers(), 3)
+```
+
+```{r}
+ROI_applicable_solvers(lp)
+```
+
+```{r}
+head(ROI_installed_solvers(),3)
+```
+
+#5.5 ROI yazma/okuma
+
+```{r}
+lp_file<-tempfile()
+
+ROI_write(lp, lp_file, "lp_lpsolve")
+
+writeLines(readLines(lp_file))
+```
+
+```{r}
+ROI_read(lp_file, "lp_lpsolve")
+```
+
+-Veri seti çekme örneği
+
+```{r}
+tmpfile <- tempfile()
+con <- gzcon(url("http://www.zib.de/koch/perplex/data/netlib/mps/capri.mps.gz"))
+writeLines(readLines(con), tmpfile)
+close(con)
+(capri <- ROI_read(tmpfile, type="mps_fixed", "lpsolve"))
+(sol <- ROI_solve(capri))
+```
+
+
+
+
+
+
+
+
+#5.6 ROI modelleri
+
+
+```{r}
+if (length(miplib()) == OL){
+  miplib_download_benchmark(quiet = TRUE)
+  miplib_download_metainfo()
+}
+```
+
+```{r}
+ops<-miplib("ns1766074")
+ops
+```
+
+```{r}
+agg<-netlib("agg")
+
+ROI_solve(agg, "glpk")
+
+```
+
+```{r}
+library(jsonlite)
+```
+
+```{r}
+nested_unclass<-function(x){
+  x<-unclass(x)
+  if(is.list(x))
+    x<-lapply(x, nested_unclass)
+  x
+}
+```
+
+```{r}
+agg_json<-toJSON(nested_unclass(agg))
+
+tmp_file<-tempfile()
+
+writeLines(agg_json, tmp_file)
+```
+
+#5.7 ROI ayarları
+```{r}
+simple_gradient<-function(func, x, ...) {
+  numDeriv::grad(func, x, method = "simple", ...)
+}
+```
+
+```{r}
+ROI_options("gradient", simple_gradient)
+```
+
+```{r}
+simple_jacobian<-function(func, x, ...) {
+  numDeriv::jacobian(func, x, method = "simple", ...)
+}
+```
+
+```{r}
+ROI_options("jacobian", simple_jacobian)
+```
+
+```{r}
+ROI_options("default_solver")
+```
+
+```{r}
+ROI_options("default_solver", "glpk")
+```
+
+```{r}
+ROI_options("default_solver", "auto")
+```
+
+```{r}
+Sys.setenv(ROI_LOAD_PLUGINS=FALSE)
+```
+
+#6. Örnekler
+
+#6.1 Doğrusal optimizasyon problemleri (LP)
+ 
+  maximize(z) = x1 + 2x2
+subject to  x1 + 8x2 = 9
+            5x1 + x2 <= 6
+       x1€[−9, 9], x2€[−7, 7]
+
+```{r}
+lp<-OP(c(1,2),
+       maximum = TRUE,
+       L_constraint(L=rbind(c(1,8),c(5,1)),
+                    dir = c("==","<="),
+                    rhs = c(9,6)),
+       bounds = V_bound(lb = c(-9,-7),
+                        ub = c(9,7)))
+```
+
+```{r}
+lp_sol<-ROI_solve(lp, "glpk")
+
+lp_sol
+```
+
+```{r}
+solution(lp_sol)
+```
+
+#6.2 Quadratic optimization problems (QP)
+
+minimize(z) = (x1^2+x2^2)/2-x1
+subject to    4x1 + 6x2 >= 10
+                 x1, x2 >= 0
+
+```{r}
+qp<-OP(Q_objective(Q = diag(2), L = c(-1,0)),
+       L_constraint(c(4,6), ">=", 10))
+```
+
+```{r}
+qp_sol<-ROI_solve(qp, "qpoases")
+
+qp_sol
+```
+
+```{r}
+solution(qp_sol)
+```
+
+Ek kısıt eklememiz gerekirse
+
+7x1 + 11x2 − x1^2 − x2^2 >= 40
+
+```{r}
+qcqp<-qp
+
+constraints(qcqp)<-rbind(constraints(qp),
+                         Q_constraint(-diag(c(2,2)),
+                                      L = c(7,11),
+                                      ">=", 40))
+
+```
+
+```{r}
+ROI_applicable_solvers(qcqp)
+```
+
+```{r}
+qcqp_sol<-ROI_solve(qcqp, "alabama", start = c(5,5))
+```
+
+```{r}
+solution(qcqp_sol)
+```
+
+```{r}
+qcqp_sol<-ROI_solve(qcqp, "neos", method = "mosek")
+```
+
+```{r}
+qcqp_sol
+```
+
+```{r}
+solution(qcqp_sol)
+```
+
+#6.3 Conic optimization problems (CP)
+
+Zero Cone
+x1 + 8x2 = 9 ←→ 9 − (1 8)x = s € Kzero
+```{r}
+cpeq<-C_constraint(c(1,8), K_zero(1), 9)
+```
+
+Linear Cone
+5x1 + x2 <= 6 ←→ 6 − (5 1)x = s € Klin
+```{r}
+cpleq<-C_constraint(c(5,1), K_lin(1), 6)
+```
+
+```{r}
+zlcp<-lp
+
+constraints(zlcp)<-c(cpeq, cpleq)
+
+zlcp_sol<-ROI_solve(zlcp, solver = "scs")
+
+zlcp_sol
+```
+
+```{r}
+solution(zlcp_sol)
+```
+
+Second-order Cone
+```{r}
+soc1<-OP(c(1,1,0),
+         C_constraint(L = rbind(c(0,0,-7),
+                                c(-3,0,0),
+                                c(0,-5,0)),
+                      cone = K_soc(3),
+                      rhs = c(6,2,4)),
+         maximum = TRUE,
+         bounds = V_bound(ld = -Inf, ui = 3, ub = 9, nobj = 3))
+```
+
+```{r}
+soc1_sol<-ROI_solve(soc1, solver = "ecos")
+soc1_sol
+```
+
+```{r}
+solution(soc1_sol)
+```
+
+```{r}
+A<-rbind(c(0,0,-1),c(-1,0,0),c(0,-1,0))
+
+soc2<-OP(objective = L_objective(c(0,0,1)),
+         constraints = c(C_constraint(A,K_soc(3),c(0,0,0)),
+                         L_constraint(c(1,1,0), "==", 2)))
+```
+
+```{r}
+soc2_sol<-ROI_solve(soc2,solver = "ecos")
+soc2_sol
+```
+
+```{r}
+solution(soc2_sol)
+```
+
+Exponential cone
+```{r}
+cexpp<-C_constraint(L = rbind(c(-3,-5,0,0),
+                              c(0,0,0,0),
+                              c(0,0,-11,-12)),
+                    cone = K_expp(1), rhs = c(7,1,9))
+```
+
+```{r}
+expp1<-OP(c(1,2,0,0), cexpp, 
+          bounds = V_bound(ld = -Inf, 
+                           ub = c(20,20,50,50)),
+          maximum = TRUE)
+```
+
+```{r}
+expp1_sol<-ROI_solve(expp1, solver = "ecos")
+
+expp1_sol
+```
+
+```{r}
+solution(expp1_sol)
+```
+
+```{r}
+A<- rbind(c(0,-1),c(0,0),c(-7,0))
+
+log1<-OP(L_objective(c(0,1),c("x","t")),
+         C_constraint(A, K_expp(1), rhs = c(0,1,9)),
+         bounds = V_bound(lb = c(0, -Inf),
+                          ub = c(1, Inf)),
+         maximum = TRUE)
+```
+
+```{r}
+Log1_sol<-ROI_solve(log1, solver = "ecos")
+Log1_sol
+```
+
+```{r}
+solution(Log1_sol)
+```
+
+Power cone
+```{r}
+A<-rbind(c(-1,0),c(0,0),c(0,-1))
+
+cpowp<-C_constraint(A, K_powp(1/4), rhs = c(5,1,2))
+
+powp1<-OP(c(3,5), cpowp, 
+          bounds = V_bound(lb = c(0,2)))
+
+```
+
+```{r}
+powp1_sol<-ROI_solve(powp1, solver = "scs",
+                     max_iter = 1e6)
+
+powp1_sol
+```
+
+```{r}
+solution(powp1_sol)
+```
+
+Positive semidefinite cone
+```{r}
+A<-matrix(c(1,2,3,2,4,5,3,5,6),nrow = 3)
+```
+
+```{r}
+vech(A)
+```
+
+```{r}
+F1<-rbind(c(10,3),c(3,10))
+F2<-rbind(c(6,-4),c(-4,10))
+F3<-rbind(c(8,1),c(1,6))
+F0<-rbind(c(16,-13),c(-13,60))
+
+psd<-OP(objective = L_objective(c(1,1,-1)),
+        constraints = C_constraint(L = vech(F1,F2,F3),
+                                   cone = K_psd(3),
+                                   rhs = vech(F0)))
+
+```
+
+```{r}
+psd_sol<-ROI_solve(psd, solver = "scs")
+
+psd_sol
+```
+
+```{r}
+solution(psd_sol)
+```
+
+#6.4 General nonlinear optimization problems
+```{r}
+nlp1<-OP(maximum = TRUE, 
+         bounds = V_bound(ud = 42, nobj = 3L))
+
+objective(nlp1)<-F_objective(F = function(x) prod(x),
+                             n =3,
+                             G = function(x) c(prod(x[-1]), prod(x[-2]), prod(x[-3])))
+
+const<-function(x) x[1]+2*x[2]+2*x[3]
+
+constraints(nlp1)<-F_constraint(F = const, 
+                                dir = "<=", 
+                                rhs = 72,
+                                J= function(x)c(1,2,2))
+
+nlp1
+```
+
+Kısıt ekleyelim
+
+```{r}
+nlp2<-nlp1
+
+constraints(nlp2)<-L_constraint(L=c(1,2,3),
+                                "<=",
+                                72)
+
+nlp2
+```
+
+```{r}
+nlp1_sol1<-ROI_solve(nlp1, "alabama", 
+                     start = c(10,10,10))
+
+nlp1_sol1
+```
+
+```{r}
+solution(nlp1_sol1)
+```
+
+```{r}
+nlp1_sol2<-ROI_solve(nlp1, "alabama", 
+                     start = c(20,20,20))
+
+nlp1_sol2
+```
+
+```{r}
+solution(nlp1_sol2)
+```
+
+```{r}
+nlp1_sol3<-ROI_solve(nlp1, "alabama",
+                     start = c(10,10,10),
+                     tol = 1E-24)
+nlp1_sol3
+```
+
+```{r}
+solution(nlp1_sol3, force = TRUE)
+```
+
+```{r}
+nlp1_sol4<-ROI_solve(nlp1, "deoptimr",
+                     start = c(20,20,20),
+                     max_iter = 400,
+                     tol = 1E-6)
+nlp1_sol4
+```
+
+```{r}
+solution(nlp1_sol4)
+```
+
+#6.5 Mixed integer problems
+
+```{r}
+A<-rbind(c(5,3),c(7,1))
+
+milp<-OP(c(5,7),
+         constraints = L_constraint(A, c(">=",">="),
+                                    c(7,9)),
+         types = c("B", "I"))
+
+milp_sol<-ROI_solve(milp, solver = "glpk")
+
+milp_sol
+```
+
+```{r}
+solution(milp_sol)
+```
+
+#7. Extending ROI
+
+#7.1 Signatures
+
+```{r}
+OP_signature(lp)
+```
+
+```{r}
+glpk_signature <- ROI_plugin_make_signature(objective = "L",
+ constraints = "L", types = c("C", "I", "B", "CI", "CB", "IB", "CIB"),
+ bounds = c("X", "V"), maximum = c(TRUE, FALSE))
+```
+
+#7.2 Yeni çözücü methodu yazma
+
+```{r}
+glpk_solve_OP<-function(x, control = list()) {
+  control$canonicalize_status<-FALSE
+  glpk<-list(Rglpk_solve_LP,
+             obj = terms(objective(x))[["L"]],
+             mat = constraints(x)$L,
+             dir = constraints(x)$dir,
+             rhs = constraints(x)$rhs,
+             bounds = bounds(x),
+             types = types(x),
+             max = maximum(x), 
+             control = control)
+  mode(glpk)<-"call"
+  if (isTRUE(control$dry_run))
+    return(glpk)
+  
+  out<-eval(glpk)
+  ROI_plugin_canonicalize_solution(solution = out$solution,
+                                   optimum = out$optimum,
+                                   status = out$status,
+                                   solver = "glpk",
+                                   message = out)
+}
+```
+
+#7.3 Çözücü yöntemlerini kaydetme
+```{r}
+ROI_plugin_register_solver_method(glpk_signature,
+                                  "glpk",
+                                  glpk_solve_OP)
+```
+#7.4 Adding additional information
+```{r}
+ROI_plugin_add_status_code_to_db(solver = "glpk", 
+                                 code = 5L,
+                                 symbol = "GLP_OPT",
+                                 message = "Solution is optimal.",
+                                 roi_code = 0L)
+```
+
+```{r}
+ROI_plugin_register_solver_control(solver = "glpk",
+                                   args = "tm_limit",
+                                   roi_control = "max_time")
+```
+
+#7.5 Registering reformulations
+```{r}
+bqp_signature <- ROI_plugin_make_signature(objective = "Q",
+ constraints = c("X", "L"), types = c("B"), bounds = c("X", "V"),
+ cones = c("X"), maximum = c(TRUE, FALSE))
+```
+
+```{r}
+milp_signature <- ROI_plugin_make_signature(objective = "L",
+ constraints = c("X", "L"),
+ types = c("C", "I", "B", "CI", "CB", "IB", "CIB"),
+ bounds = c("X", "V"), maximum = c(TRUE, FALSE), cones = c("X"))
+```
+
+```{r}
+ROI_plugin_register_reformulation(from = bqp_signature, 
+                                  to = milp_signature, 
+                                  method_name = "bqp_to_lp",
+                                  method = bqp_to_lp, 
+                                  description = "", 
+                                  cite = "", 
+                                  author = "")
+```
+
+#7.6. Registering reader/writer
+```{r}
+library(slam)
+```
+
+```{r}
+json_reader_lp <- function(file, ...) {
+ stopifnot(is.character(file))
+ y <- read_json(file, simplifyVector = TRUE)
+ to_slam <- function(x) do.call(simple_triplet_matrix, x)
+ x <- OP()
+ objective(x) <- L_objective(to_slam(y[["objective"]][["L"]]),
+ y[["objective"]][["names"]])
+ constraints(x) <- L_constraint(to_slam(y[["constraints"]][["L"]]),
+ y[["constraints"]][["dir"]], y[["constraints"]][["rhs"]],
+ y[["constraints"]][["names"]])
+ types(x) <- y[["types"]]
+ bounds(x) <- structure(y[["bounds"]], class = c("V_bound", "bound"))
+ maximum(x) <- as.logical(y[["maximum"]])
+ x
+ }
+```
+
+```{r}
+json_writer_lp <- function(x, file, ...) {
+ writeLines(toJSON(nested_unclass(x), null = "null"), con = file)
+ }
+```
+
+```{r}
+plugin_name <- "io"
+ROI_plugin_register_writer("json", plugin_name, milp_signature, json_writer_lp)
+ROI_plugin_register_reader("json", plugin_name, json_reader_lp)
+```
+
+```{r}
+fname <- tempfile()
+file <- ROI_write(lp, file = fname, type = "json")
+lp_json <- ROI_read(file = fname, type = "json")
+```
+
+#7.7 ROI Test
+
+
+```{r}
+test_solver("glpk")
+```
+
+#8. Applications
+
+#8.1 L1 regression
+
+```{r}
+create_L1_problem <- function(x, y) {
+ p <- ncol(x) + 1L
+ m <- 2 * nrow(x)
+ L <- cbind(1, x, diag(nrow(x)), -diag(nrow(x)))
+ bnds <- V_bound(li = seq_len(p), lb = rep(-Inf, p), nobj = p+m)
+ OP(objective = L_objective(c(rep(0, p), rep(1, m))),
+    constraints = L_constraint(L, dir = eq(nrow(x)), rhs = y),
+    bounds = bnds)
+ }
+```
+
+```{r}
+data("stackloss", package = "datasets")
+
+l1p<-create_L1_problem(x = as.matrix(stackloss)[,-4],
+                       y = stackloss[,4])
+
+
+L1_res<-ROI_solve(l1p, solver = "glpk")
+
+solution(L1_res)[1:ncol(stackloss)]
+```
+
+#8.2 Best subset selection
+
+#8.3 Relative risk regression
+```{r}
+logbin_gps <- function(y, X) {
+ loglikelihood <- function(beta) {
+ xb <- drop(X %*% beta)
+ if (any(xb > 0)) NaN else sum(y * xb + (1 - y) * log(1 - exp(xb)))
+ }
+
+gradient <- function(beta) {
+ exb <- exp(drop(X %*% beta))
+ drop(crossprod(X, (y - exb) / (1 - exb)))
+ }
+
+OP(F_objective(loglikelihood, n = ncol(X), G = gradient),
+ L_constraint(L = X, dir = leq(nrow(X)), rhs = double(nrow(X))),
+ bounds = V_bound(ld = -Inf, nobj = ncol(X)), maximum = TRUE)
+}
+
+```
+
+```{r}
+R> logbin_cp <- function(y, X, rhs_eps = 1e-7) {
+ y_is_0 <- y == 0L
+ n_y_is_0 <- sum(y_is_0)
+ o <- OP(c(y %*% X, double(n_y_is_0), rep(1, n_y_is_0)), maximum = TRUE)
+ L1 <- cbind(X, matrix(0, nrow(X), 2 * n_y_is_0))
+ log1exp <- function(xi, j, n_y_is_0) {
+   M <- matrix(0, nrow = 6, ncol = length(xi) + 2 * n_y_is_0)
+   M[1, seq_along(xi)] <- -xi
+   M[3, length(xi) + j] <- -1
+   M[4, length(xi) + n_y_is_0 + j] <- -1
+   M[6, length(xi) + j] <- 1
+   M
+ }
+ L2 <- mapply(log1exp, split(X[y_is_0,], seq_len(n_y_is_0)),
+              seq_len(n_y_is_0), MoreArgs = list(n_y_is_0 = n_y_is_0),
+              SIMPLIFY = FALSE)
+ rhs <- c(c(0, 1, 0), c(0, 1, 1))
+ rhs <- c(rep(-rhs_eps, nrow(X)), rep(rhs, n_y_is_0))
+ cones <- c(K_lin(nrow(X)), K_expp(2 * n_y_is_0))
+ L <- do.call(rbind, c(list(L1), L2))
+ constraints(o) <- C_constraint(L, cones, rhs)
+ bounds(o) <- V_bound(ld = -Inf, nobj = length(objective(o)))
+ o
+}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
